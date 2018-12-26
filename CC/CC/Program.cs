@@ -10,12 +10,11 @@ namespace CC
     {
         static void Main(string[] args)
         {
-            // The code provided will print ‘Hello World’ to the console.
-            // Press Ctrl+F5 (or go to Debug > Start Without Debugging) to run your app.
-            Console.WriteLine("Hello World!");
-            Console.ReadKey();
-
-            // Go to http://aka.ms/dotnet-get-started-console to continue learning how to build a console app! 
+            int curr_port = 2019;
+            string curr_ip = "192.168.0.26";
+            Console.WriteLine("Command and control server {0} active", "Hadas&roteM");
+            CCServer ccs = new CCServer(curr_port, curr_ip);
+            ccs.control();
         }
     }
 }
