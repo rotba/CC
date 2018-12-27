@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace CC
 {
-    class CCServer
+    public class CCServer
     {
         private readonly string _cc_name = "THE PENTAGON OF HADAS AND ROTEM!";
         static readonly int MAX_SIZE = 256;
@@ -31,7 +31,7 @@ namespace CC
             _udpclient = new UdpClient(_listen_port);
             _server_end_point = new IPEndPoint(IPAddress.Any, _listen_port);
             _bots = new List<Bot>();
-            UdpClient uclient = new UdpClient();
+            //UdpClient uclient = new UdpClient();
         }
         public void serve()
         {
@@ -176,12 +176,12 @@ namespace CC
 
         private CmdType get_cmd_type(string cmd)
         {
-            if (cmd.StartsWith("Set victim") || cmd.StartsWith("Set Victim"))
+            if (cmd.StartsWith("Set victim",true,null) )
             {
                 return CmdType.SET_VICTIM;
-            } else if (cmd.Equals("Show") || cmd.Equals("show")) {
+            } else if ((cmd.ToLower()).Equals("show")) {
                 return CmdType.SHOW;
-            } else if (cmd.Equals("activate") || cmd.Equals("Activate")) {
+            } else if ((cmd.ToLower()).Equals("activate")) {
                 return CmdType.ACTIVATE;
             }
             else {
