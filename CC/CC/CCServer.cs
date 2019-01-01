@@ -49,7 +49,7 @@ namespace CC
         }
         private void listen()
         {
-            while (!true)
+            while (true)
             {
                 IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
                 byte[] rcv_buffer = _udpclient.Receive(ref sender);
@@ -212,7 +212,7 @@ namespace CC
 
         private void handle_invalid_bot_announcment(byte[] data, EndPoint remote)
         {
-            throw new NotImplementedException();
+            Console.WriteLine("invalid bot annoncment recived");
         }
 
         private string receive(Socket listen_socket)
